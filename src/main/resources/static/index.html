@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+    <meta charset="UTF-8">
+    <title>基于Hadoop的日志分析</title>
+    <!-- 粒子背景特效 -->
+    <script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+    <!-- Chart.js 图表库 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css?family=Roboto:700,400&display=swap" rel="stylesheet">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Roboto', '微软雅黑', sans-serif;
+            min-height: 100vh;
+            background: #151c2e;
+            color: #fff;
+            overflow-x: hidden;
+        }
+        #particles-js {
+            position: fixed;
+            z-index: 0;
+            width: 100vw;
+            height: 100vh;
+            top: 0; left: 0; right: 0; bottom: 0;
+        }
+        h1 {
+            margin-top: 50px;
+            font-size: 3rem;
+            letter-spacing: 4px;
+            color: #fff;
+            text-shadow: 0 4px 32px #2ed4ff, 0 2px 12px #111d2b;
+            position: relative;
+            z-index: 2;
+            text-align: center;
+        }
+        .container {
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+            align-items: flex-start;
+            gap: 40px;
+            margin-top: 40px;
+            max-width: 1400px;
+            width: 100%;
+            margin-left: auto;
+            margin-right: auto;
+            position: relative;
+            z-index: 2;
+        }
+        .table-container, .charts-container {
+            background: rgba(25, 30, 46, 0.92);
+            border-radius: 20px;
+            box-shadow: 0 8px 40px 0 rgba(46, 212, 255, 0.13), 0 0 16px #2ed4ff22;
+            padding: 38px 44px 38px 44px;
+            min-width: 400px;
+            max-width: 520px;
+            transition: box-shadow 0.3s;
+        }
+        .charts-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 600px;
+            max-width: 760px;
+            min-height: 420px;
+            gap: 36px;
+        }
+        table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: 1.22rem;
+            color: #fff;
+            background: transparent;
+        }
+        thead th {
+            background: linear-gradient(90deg, #2ed4ff 0%, #3498db 100%);
+            color: #fff;
+            font-weight: bold;
+            padding: 18px 0;
+            font-size: 1.15em;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+            border-bottom: 2px solid #2ed4ff;
+            box-shadow: 0 2px 6px #2ed4ff33;
+            letter-spacing: 2px;
+        }
+        tbody tr {
+            transition: background 0.2s, box-shadow 0.2s;
+        }
+        tbody tr:hover {
+            background: #1b263b;
+            box-shadow: 0 2px 8px #2ed4ff33;
+        }
+        td {
+            padding: 12px 0;
+            text-align: center;
+            border-bottom: 1px solid #222f43;
+        }
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+        .chart-block {
+            background: rgba(21,28,46,0.90);
+            border-radius: 16px;
+            box-shadow: 0 2px 16px #2ed4ff33;
+            margin-bottom: 10px;
+            padding: 20px 16px 8px 16px;
+            width: 100%;
+        }
+        .chart-title {
+            color: #2ed4ff;
+            font-size: 1.18em;
+            font-weight: bold;
+            letter-spacing: 2px;
+            margin-bottom: 18px;
+            text-align: center;
+            text-shadow: 0 2px 12px #2ed4ff44;
+        }
+        @media (max-width: 1100px) {
+            .container {
+                flex-direction: column;
+                align-items: center;
+                gap: 26px;
+            }
+            .table-container, .charts-container {
+                min-width: unset;
+                max-width: 98vw;
+            }
+            .charts-container { min-width: unset; }
+        }
+        @media (max-width: 600px) {
+            h1 { font-size: 2em; }
+            .table-container, .charts-container { padding: 18px 6vw; }
+            .charts-container { min-width: unset; }
+        }
+    </style>
+</head>
+<body>
+<div id="particles-js"></div>
+<h1>基于Hadoop的日志分析系统</h1>
+<div class="container">
+    <div class="table-container">
+        <table>
+            <thead>
+            <tr>
+                <th>IP</th>
+                <th>访问次数</th>
+            </tr>
+            </thead>
+            <tbody id="ipcount-table">
+            </tbody>
+        </table>
+    </div>
+    <div class="charts-container">
+        <div class="chart-block">
+            <div class="chart-title">IP访问趋势（折线图）</div>
+            <canvas id="ipLineChart" width="600" height="280"></canvas>
+        </div>
+        <div class="chart-block">
+            <div class="chart-title">访问量占比（饼状图）</div>
+            <canvas id="ipPieChart" width="600" height="260"></canvas>
+        </div>
+    </div>
+</div>
+<script>
+    // 粒子动画初始化
+    particlesJS("particles-js", {
+        particles: {
+            number: { value: 90 },
+            color: { value: "#2ed4ff" },
+            shape: { type: "circle" },
+            opacity: { value: 0.20 },
+            size: { value: 3.5 },
+            line_linked: { enable: true, distance: 160, color: "#2ed4ff", opacity: 0.18, width: 1 },
+            move: { enable: true, speed: 2 }
+        }
+    });
+
+    // 获取数据（建议用绝对路径，适配各种部署）
+    fetch('/log_analysis_war/api/ipcount')
+        .then(response => response.json())
+        .then(data => {
+            // 渲染表格
+            const table = document.getElementById('ipcount-table');
+            table.innerHTML = '';
+            data.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${row.ip}</td><td>${row.cnt}</td>`;
+                table.appendChild(tr);
+            });
+
+            // 渲染折线图
+            const labels = data.map(row => row.ip);
+            const counts = data.map(row => row.cnt);
+            const lineCtx = document.getElementById('ipLineChart').getContext('2d');
+            new Chart(lineCtx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'IP访问次数',
+                        data: counts,
+                        borderColor: 'rgba(46,212,255,0.95)',
+                        backgroundColor: 'rgba(46,212,255,0.18)',
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#2ed4ff',
+                        borderWidth: 4,
+                        pointRadius: 6,
+                        tension: 0.35,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `访问次数: ${context.parsed.y}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'IP地址',
+                                color: '#2ed4ff',
+                                font: { size: 16 }
+                            },
+                            ticks: {
+                                color: '#b9efff',
+                                maxRotation: 60,
+                                minRotation: 30,
+                                font: { size: 12 }
+                            },
+                            grid: { display: false }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '访问次数',
+                                color: '#2ed4ff',
+                                font: { size: 16 }
+                            },
+                            ticks: {
+                                color: '#b9efff',
+                                font: { size: 12 }
+                            },
+                            grid: { color: '#2ed4ff22' }
+                        }
+                    }
+                }
+            });
+
+            // 渲染饼状图（取访问量Top10）
+            const pieData = data.slice(0, 10).sort((a, b) => b.cnt - a.cnt);
+            const pieLabels = pieData.map(r => r.ip);
+            const pieCounts = pieData.map(r => r.cnt);
+            const pieCtx = document.getElementById('ipPieChart').getContext('2d');
+            new Chart(pieCtx, {
+                type: 'pie',
+                data: {
+                    labels: pieLabels,
+                    datasets: [{
+                        data: pieCounts,
+                        backgroundColor: [
+                            '#2ed4ff', '#22b7e7', '#47e1ff', '#7cf5ff', '#c7f6ff',
+                            '#1e9ab7', '#267c89', '#3fced9', '#9ad9e5', '#2e99ff'
+                        ],
+                        borderColor: '#151c2e',
+                        borderWidth: 3
+                    }]
+                },
+                options: {
+                    responsive: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: {
+                                color: '#b9efff',
+                                font: { size: 14 }
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.label}: ${context.parsed}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        });
+</script>
+</body>
+</html>
